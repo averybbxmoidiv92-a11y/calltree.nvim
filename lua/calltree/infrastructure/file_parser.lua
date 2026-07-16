@@ -1,32 +1,16 @@
---- infrastructure/file_parser.lua — unified file read + treesitter parse + cache.
+--- infrastructure/file_parser.lua — file read, parse, and cache helpers.
 ---
---- This module consolidates the read+parse+cache logic that was previously
---- duplicated across callers.lua (_read_and_parse_ref), definition_body.lua
---- (_read_def_source + _parse_def_tree, _read_and_parse_module), and
---- providers/file_reader.lua. The duplicated implementations had slightly
---- different behaviors:
----   - callers cached failure results as outcome/reason tables
----   - definition_body did not cache failures
----   - file_reader was a standalone class not integrated into the main
----     analysis path
----
---- This module provides unified read_source / parse_tree / new(opts) helper
---- functions. Call sites keep their own decision-record style but delegate
---- the underlying I/O + parse + cache to this module.
---- Pure Lua, no Neovim dependencies.
+--- Pure Lua helpers used by analysis code that needs source text and a
+--- parsed Treesitter root for files referenced by LSP locations.
 
 local path_utils = require("calltree.utils.path")
-local constants   = require("calltree.utils.constants")
 local fifo_cache  = require("calltree.utils.fifo_cache")
+local tree_parser = require("calltree.infrastructure.tree_parser")
 
 local M = {}
 
 -- Maximum number of cached file entries. Prevents unbounded memory growth
--- in long sessions that analyze many different files. When the limit is
--- exceeded, the oldest entries (by insertion order) are evicted via the
--- shared fifo_cache utility (replacing the previously hand-rolled
--- cache_set / cache_order pair that was duplicated, slightly differently,
--- in file_reader.lua and lsp_client.lua's _evict_diag_cache).
+-- in long sessions that analyze many different files.
 local MAX_CACHE_ENTRIES = 128
 
 ------------------------------------------------------------------------------
@@ -65,58 +49,14 @@ function M.read_source(uri, main_uri, main_source, read_file)
 end
 
 ------------------------------------------------------------------------------
--- 2. Treesitter parsing (unified entry point)
+-- 2. Treesitter parsing
 ------------------------------------------------------------------------------
 
---- Parse source code using the injected treesitter service, returning the
---- root node. ts.parse is wrapped in pcall to prevent parse exceptions
---- from propagating.
---- @param ts table  treesitter service (with parse(source, lang) method)
---- @param source string
---- @param language string|nil  defaults to "lua"
---- @return table|nil root, table|nil tree, string|nil error_message
-function M.parse_tree(ts, source, language)
-  if ts == nil then return nil, nil, "nil treesitter service" end
-  if source == nil then return nil, nil, "nil source" end
-  local lang = language or constants.DEFAULT_LANGUAGE
-  local ok, tree = pcall(ts.parse, ts, source, lang)
-  if not ok or not tree then
-    -- tostring(tree) on a nil returns "nil"; on a table returns a memory
-    -- address. Provide a more useful message by inspecting the type when
-    -- vim.inspect is available. Truncate to DEBUG_TRUNCATE_LEN to bound
-    -- the error message size.
-    local err_msg
-    local max_len = constants.DEBUG_TRUNCATE_LEN or 200
-    if vim and vim.inspect and type(tree) == "table" then
-      err_msg = "treesitter parse failed: " .. vim.inspect(tree):sub(1, max_len)
-    else
-      err_msg = "treesitter parse failed: " .. tostring(tree)
-    end
-    return nil, nil, err_msg
-  end
-  -- Wrap `tree:root()` in pcall and guard against `tree.root` being a
-  -- non-function truthy value (e.g. a mock tree where `root` is a field
-  -- rather than a method). Previously `tree.root and tree:root() or tree`
-  -- would crash on a mock tree whose `root` field is truthy but not a
-  -- function, because `tree:root()` would attempt to call a non-callable.
-  local root
-  if type(tree.root) == "function" then
-    local ok_r, r = pcall(tree.root, tree)
-    root = (ok_r and r) or nil
-  elseif type(tree.root) == "table" then
-    -- Some mocks store the root node directly as a `root` field.
-    root = tree.root
-  else
-    root = tree
-  end
-  if root == nil then
-    return nil, tree, "parse succeeded but root is nil"
-  end
-  return root, tree, nil
-end
+M.extract_root = tree_parser.extract_root
+M.parse_tree = tree_parser.parse_tree
 
 ------------------------------------------------------------------------------
--- 3. Combined: read + parse + cache (unified entry point)
+-- 3. Combined: read + parse + cache
 ------------------------------------------------------------------------------
 
 --- Create a cached file_parser instance.
