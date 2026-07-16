@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s02_callers",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s02_callers/s02_callers.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s02_callers/s02_callers.c"
+  }
+]

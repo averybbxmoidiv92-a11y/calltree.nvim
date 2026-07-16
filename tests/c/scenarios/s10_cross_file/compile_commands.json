@@ -1,0 +1,12 @@
+[
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s10_cross_file",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s10_cross_file/main.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s10_cross_file/main.c"
+  },
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s10_cross_file",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s10_cross_file/math.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s10_cross_file/math.c"
+  }
+]

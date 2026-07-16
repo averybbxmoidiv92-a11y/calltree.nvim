@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile/caller_a.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile/caller_a.c"
+  },
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile/caller_b.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile/caller_b.c"
+  },
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile/caller_c.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile/caller_c.c"
+  },
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile/core.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/multifile/core.c"
+  }
+]

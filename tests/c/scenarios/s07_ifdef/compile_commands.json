@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s07_ifdef",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s07_ifdef/s07_ifdef.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s07_ifdef/s07_ifdef.c"
+  }
+]

@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s04_funcptr",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s04_funcptr/s04_funcptr.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s04_funcptr/s04_funcptr.c"
+  }
+]

@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s06_typedef",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s06_typedef/s06_typedef.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/scenarios/s06_typedef/s06_typedef.c"
+  }
+]

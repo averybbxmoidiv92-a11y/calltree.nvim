@@ -1,0 +1,12 @@
+[
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/stress1_nested.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/stress1_nested.c"
+  },
+  {
+    "directory": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress",
+    "command": "gcc -c /home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/stress3_control_flow.c",
+    "file": "/home/z/my-project/workspace/plugin-code/calltree.nvim/tests/c/stress/stress3_control_flow.c"
+  }
+]

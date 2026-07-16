@@ -1,0 +1,13 @@
+{
+  "name": "calltree-javascript-test-fixture",
+  "version": "1.0.0",
+  "description": "Mini JS project for calltree.nvim integration tests",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"no-op test script\""
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
