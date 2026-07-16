@@ -7,62 +7,40 @@
 ---
 --- Pure Lua, no Neovim dependencies.
 
-local utils     = require("calltree.utils")
-local debug_mod = require("calltree.utils.debug")
+local utils       = require("calltree.utils")
+local tree_parser = require("calltree.infrastructure.tree_parser")
 
 local M = {}
 
 ------------------------------------------------------------------------------
--- _search_symbol_tree: recursive search of a DocumentSymbol tree for the
--- symbol whose range contains cursor_pos AND whose kind is Function or
--- Method. Prefers the deepest matching symbol (descends into children
--- before returning the current sym).
---
--- Extracted to module level (previously a nested `search` closure inside
--- M.find_function_symbol_at). The nested version couldn't be unit-tested
--- in isolation and was 33 lines deep, hurting readability. The depth
--- limit is now passed explicitly so callers control the cap.
---
--- The long in-range expression was split into `after_start` / `before_end`
--- locals for readability (Lua's `and`/`or` precedence makes the original
--- one-liner technically correct but very hard to follow).
+-- LSP SymbolKind constants used by document-symbol search.
 ------------------------------------------------------------------------------
--- LSP SymbolKind constants used by the symbol search below.
--- Local aliases keep the comparisons readable; the values themselves
--- are sourced from the centralized utils.constants table so a future
--- SymbolKind edit only needs one change. Previously VARIABLE / CONSTANT
--- were redefined here as local literals (duplicating core/analyzer.lua),
--- while FUNCTION / METHOD already came from utils — the inconsistency
--- was a code-review finding.
 local LSP_SYMBOL_FUNCTION = utils.LSP_SYMBOL_FUNCTION
 local LSP_SYMBOL_METHOD   = utils.LSP_SYMBOL_METHOD
 local LSP_SYMBOL_VARIABLE = utils.LSP_SYMBOL_VARIABLE
 local LSP_SYMBOL_CONSTANT = utils.LSP_SYMBOL_CONSTANT
 
--- _search_symbol_tree: recursive search of a DocumentSymbol tree for the
--- symbol whose range contains cursor_pos AND whose kind is Function or
--- Method. Prefers the deepest matching symbol (descends into children
--- before returning the current sym).
---
--- JS/TS arrow-function fallback: typescript-language-server classifies
--- `const add = (a,b) => a+b` as a Constant (14), not a Function (12).
--- When no Function/Method symbol is found at the cursor, we accept a
--- Variable (13) or Constant (14) symbol as a fallback — the caller
--- (analyzer._locate_cursor_function) re-validates that the treesitter
--- node at the cursor is actually a function-type node before trusting
--- this fallback, so a non-function variable/constant won't slip through.
+-- Return true when an LSP range contains a cursor position. The LSP uses
+-- zero-based line/character coordinates, matching ctx.cursor_pos.
+local function _range_contains_cursor(range, cursor_pos)
+  if range == nil or range.start == nil or range["end"] == nil then return false end
+  local s, e = range.start, range["end"]
+  local after_start = cursor_pos.line > s.line
+    or (cursor_pos.line == s.line and cursor_pos.character >= s.character)
+  local before_end = cursor_pos.line < e.line
+    or (cursor_pos.line == e.line and cursor_pos.character <= e.character)
+  return after_start and before_end
+end
+
+-- Search a DocumentSymbol tree for the deepest function or method at the
+-- cursor. Variable/Constant symbols are accepted as a JS/TS arrow-function
+-- fallback; the caller verifies the matching treesitter node is a function.
 local function _search_symbol_tree(list, cursor_pos, depth, max_depth)
   if depth > max_depth then return nil end
   -- First pass: look for a Function/Method symbol (preferred).
   for _, sym in ipairs(list) do
-    if sym.range and sym.range.start and sym.range["end"] then
-      local s, e = sym.range.start, sym.range["end"]
-      local after_start = cursor_pos.line > s.line
-        or (cursor_pos.line == s.line and cursor_pos.character >= s.character)
-      local before_end = cursor_pos.line < e.line
-        or (cursor_pos.line == e.line and cursor_pos.character <= e.character)
-      local in_range = after_start and before_end
-      if in_range and (sym.kind == LSP_SYMBOL_FUNCTION
+    if _range_contains_cursor(sym.range, cursor_pos) then
+      if (sym.kind == LSP_SYMBOL_FUNCTION
                       or sym.kind == LSP_SYMBOL_METHOD) then
         if sym.children and #sym.children > 0 then
           local deeper = _search_symbol_tree(sym.children, cursor_pos, depth + 1, max_depth)
@@ -72,54 +50,25 @@ local function _search_symbol_tree(list, cursor_pos, depth, max_depth)
       end
     end
   end
-  -- Second pass: descend into children of any in-range symbol to find
-  -- a deeper Function/Method match (covers nested function definitions
-  -- inside a class/module symbol that itself isn't Function/Method).
+  -- Descend through in-range non-function symbols to find nested functions.
   for _, sym in ipairs(list) do
-    if sym.range and sym.range.start and sym.range["end"] then
-      local s, e = sym.range.start, sym.range["end"]
-      local after_start = cursor_pos.line > s.line
-        or (cursor_pos.line == s.line and cursor_pos.character >= s.character)
-      local before_end = cursor_pos.line < e.line
-        or (cursor_pos.line == e.line and cursor_pos.character <= e.character)
-      if (after_start and before_end) and sym.children and #sym.children > 0 then
-        local deeper = _search_symbol_tree(sym.children, cursor_pos, depth + 1, max_depth)
-        if deeper then return deeper end
-      end
+    if _range_contains_cursor(sym.range, cursor_pos) and sym.children and #sym.children > 0 then
+      local deeper = _search_symbol_tree(sym.children, cursor_pos, depth + 1, max_depth)
+      if deeper then return deeper end
     end
   end
-  -- Third pass (JS/TS fallback): if no Function/Method was found, accept
-  -- a Variable (13) or Constant (14) symbol whose range contains the
-  -- cursor. The caller re-validates this against the treesitter node.
+  -- JS/TS arrow-function fallback.
   for _, sym in ipairs(list) do
-    if sym.range and sym.range.start and sym.range["end"] then
-      local s, e = sym.range.start, sym.range["end"]
-      local after_start = cursor_pos.line > s.line
-        or (cursor_pos.line == s.line and cursor_pos.character >= s.character)
-      local before_end = cursor_pos.line < e.line
-        or (cursor_pos.line == e.line and cursor_pos.character <= e.character)
-      if (after_start and before_end)
-         and (sym.kind == LSP_SYMBOL_VARIABLE or sym.kind == LSP_SYMBOL_CONSTANT) then
-        return sym
-      end
+    if _range_contains_cursor(sym.range, cursor_pos)
+       and (sym.kind == LSP_SYMBOL_VARIABLE or sym.kind == LSP_SYMBOL_CONSTANT) then
+      return sym
     end
   end
   return nil
 end
 
 ------------------------------------------------------------------------------
--- Sub-checks, extracted from M.check to keep each focused and testable.
--- Each returns (ok, payload); payload is the treesitter root or symbol
--- list (nil when ok is false). Previously M.check was 112 lines mixing
--- treesitter / LSP interface / document-symbol checks — these helpers
--- reduce it to ~19 lines and let each sub-check be tested independently.
---
--- IMPORTANT: these `local function` declarations MUST appear above
--- M.check. Lua local functions are lexically scoped — a `local function
--- foo()` declared AFTER M.check would NOT be visible inside M.check's
--- body (the reference inside M.check would resolve to the global `foo`,
--- which is nil). A previous refactor introduced this ordering bug,
--- which silently broke every pure-Lua unit test (`preconditions_panic`).
+-- Sub-checks. Each returns ok plus the payload needed by later phases.
 ------------------------------------------------------------------------------
 
 -- 1. Treesitter present + interface valid + parse succeeds + root usable.
@@ -168,39 +117,16 @@ local function _check_treesitter(ctx, dbg)
     return false
   end
 
-  -- Wrap `tree:root()` in pcall + type guard (consistent with
-  -- file_parser.parse_tree and file_reader.get_tree). Simplified the
-  -- `tree.root ~= nil and type(...) == "table"` branch — the `~= nil`
-  -- check is redundant since `type(x) == "table"` already implies x is
-  -- non-nil.
-  local root
-  if type(tree.root) == "function" then
-    local ok_r, r = pcall(tree.root, tree)
-    root = (ok_r and r) or nil
-  elseif type(tree.root) == "table" then
-    root = tree.root
-  else
-    root = tree
-  end
+  local root = tree_parser.extract_root(tree)
   if root == nil then
     dbg:precondition("treesitter.root", false, "root is nil")
     return false
   end
-  -- Unified the two has_error check styles: previously tree-level used
-  -- `== true` and root-level used `type() == "boolean" and ...`. Both
-  -- now use the simpler `== true` form (Lua treats only true/nil as
-  -- booleans in this context; non-boolean values are treated as falsy
-  -- which is the desired behavior for a missing has_error field).
   if root.has_error == true then
     dbg:precondition("treesitter.root_has_error", false, "root.has_error is true")
     return false
   end
-  -- Defensive: when `tree.root` is a function but returns nil (mock
-  -- scenarios, or treesitter parse anomaly), the `or tree` fallback
-  -- would assign `root = tree`. The downstream `root:type()` call
-  -- requires `type` to be a method on root — many mock trees only
-  -- implement `root()` and not `type()`, which would crash here.
-  -- Bail out explicitly when root has no `type` method.
+  -- The analyzer expects a treesitter-like node.
   if type(root.type) ~= "function" then
     dbg:precondition("treesitter.root.type_method", false,
       "root has no :type() method (tree.root() returned non-node?)")
@@ -219,8 +145,6 @@ local function _check_lsp_interface(ctx, dbg)
     return false
   end
   local lsp_ok = true
-  -- Use the centralized constant instead of an inline list literal so
-  -- this stays in sync with any future additions to the required set.
   for _, m in ipairs(utils.REQUIRED_LSP_METHODS) do
     if type(lsp_client[m]) ~= "function" then
       lsp_ok = false
